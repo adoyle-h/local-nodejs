@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o errtrace
+(shopt -p inherit_errexit &>/dev/null) && shopt -s inherit_errexit
+
+readonly SCRIPT_DIR="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+readonly TEMP_DIR=${SCRIPT_DIR}/../temp
+
+download_nvm() {
+  local version=$1
+  local tgz_file=$TEMP_DIR/nvm_${version}.tar.gz
+
+  if [[ ! -f $tgz_file ]]; then
+    curl -Lo "$tgz_file" "https://github.com/nvm-sh/nvm/archive/v${version}.tar.gz"
+  fi
+  tar -xzf "$tgz_file" -C "$TEMP_DIR"
+  mv "$TEMP_DIR/nvm-${version}" "$NVM_DIR"
+}
+
+install_node() {
+  local node_version=$1
+  local NVM_NODE_DIR="$NVM_DIR/versions/node/v${node_version}"
+
+  if [[ ! -d $NVM_NODE_DIR ]]; then
+    # shellcheck source=nvm/nvm.sh
+    source "$NVM_DIR/nvm.sh"
+    nvm install "$node_version"
+  fi
+
+  rm -rf "$NODE_DIR"
+  mv "$NVM_NODE_DIR" "$NODE_DIR"
+}
+
+
+run() {
+  local node_version=${1:-12}
+  local target_dir=${2:-.}
+
+  mkdir -p "$TEMP_DIR"
+  target_dir=$(realpath "$target_dir")
+  export NVM_DIR="$target_dir/nvm"
+  export NODE_DIR="$target_dir/node"
+
+  if [[ ! -e $NVM_DIR ]]; then
+    download_nvm 0.35.3
+  fi
+
+  install_node "$node_version"
+
+  echo "NodeJS installed at $NODE_DIR"
+  echo "Set 'export PATH=\"$NODE_DIR:\${PATH}\"' before using node/npm/npx commands"
+}
+
+run "$@"
